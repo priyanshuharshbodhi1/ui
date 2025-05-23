@@ -1,6 +1,13 @@
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    _retry?: boolean;
+  }
+}
 import { toast } from 'react-hot-toast';
-import { isTokenExpired } from '../utils/tokenUtils';
+import { refreshToken } from '../api/auth';
+import { isTokenExpired, getTimeUntilExpiration } from '../utils/tokenUtils';
 import { logout } from '../hooks/useAuth';
 
 export const api = axios.create({
@@ -11,20 +18,56 @@ export const api = axios.create({
   },
 });
 
-// Add request interceptor to include JWT token in headers and check for expiration
+let refreshTokenPromise: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+  if (refreshTokenPromise) {
+    return refreshTokenPromise;
+  }
+
+  const oldRefreshToken = localStorage.getItem('refreshToken');
+  if (!oldRefreshToken) {
+    return Promise.reject(new Error('No refresh token available'));
+  }
+
+  refreshTokenPromise = new Promise<string>((resolve, reject) => {
+    refreshToken({ refreshToken: oldRefreshToken })
+      .then(response => {
+        localStorage.setItem('jwtToken', response.token);
+        localStorage.setItem('refreshToken', response.refreshToken);
+        resolve(response.token);
+      })
+      .catch(err => {
+        logout();
+        reject(err);
+      })
+      .finally(() => {
+        refreshTokenPromise = null;
+      });
+  });
+
+  return refreshTokenPromise;
+}
+
+// Add request interceptor to include JWT token in headers and check for token refresh needs
 api.interceptors.request.use(
-  config => {
+  async (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('jwtToken');
     if (token) {
-      // Check if token is expired before adding it to headers
       if (isTokenExpired(token)) {
-        // Token is expired, logout and clear it
-        console.warn('Token expired, logging out');
-        logout();
-        // Don't add expired token to request
+        try {
+          const newToken = await refreshAccessToken();
+          config.headers.Authorization = `Bearer ${newToken}`;
+        } catch {
+          console.warn('Token refresh failed');
+        }
       } else {
-        // Token is valid, add to headers
         config.headers.Authorization = `Bearer ${token}`;
+
+        const timeUntilExpiration = getTimeUntilExpiration(token);
+        if (timeUntilExpiration > 0 && timeUntilExpiration < 5 * 60 * 1000) {
+          refreshAccessToken().catch(() => {});
+        }
       }
     }
     return config;
@@ -34,36 +77,48 @@ api.interceptors.request.use(
   }
 );
 
-// Add response interceptors with proper error typing and token expiration handling
 api.interceptors.response.use(
   response => response,
-  (error: AxiosError<{ message: string; error: string }>) => {
-    // Handle global error cases
-    const errorMessage =
-      error.response?.data?.message || error.response?.data?.error || error.message;
+  async (error: AxiosError<{ message: string; error: string }>) => {
+    if (!error.config || !error.response) {
+      return Promise.reject(error);
+    }
 
-    console.error('API Error:', errorMessage);
+    if (error.response.status === 401) {
+      const originalRequest = error.config;
+      const refreshTokenExists = localStorage.getItem('refreshToken');
+      const isAuthCheck = originalRequest.url?.includes('/api/me');
+      const isRefreshRequest = originalRequest.url?.includes('/auth/refresh');
 
-    // Handle 401 Unauthorized errors (expired or invalid token)
-    if (error.response?.status === 401) {
-      const isAuthCheck = error.config?.url?.includes('/api/me');
-      const token = localStorage.getItem('jwtToken');
-      
-      if (token && !isAuthCheck) {
-        // If we have a token and this is not an auth check endpoint,
-        // the token is likely expired or invalid - log out the user
-        console.warn('Received 401 from API, logging out user');
-        logout();
+      if (refreshTokenExists && !isRefreshRequest && !isAuthCheck && !originalRequest._retry) {
+        originalRequest._retry = true;
+
+        try {
+          const newToken = await refreshAccessToken();
+
+          if (originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          }
+
+          return api(originalRequest);
+        } catch (refreshError) {
+          console.warn('Token refresh failed');
+          toast.error('Your session has expired. Please log in again.');
+          logout();
+          return Promise.reject(refreshError);
+        }
+      } else if (isRefreshRequest) {
+        console.warn('Invalid refresh token');
         toast.error('Your session has expired. Please log in again.');
+        logout();
       } else if (!isAuthCheck) {
-        // For non-auth-check endpoints, show error message
         toast.error('Authentication required. Please log in.');
       } else {
-        // For auth check endpoints, silently fail
         console.log('Auth verification failed, ignoring toast');
       }
     } else {
-      // For all other errors, show toast notification
+      const errorMessage =
+        error.response?.data?.message || error.response?.data?.error || error.message;
       toast.error(errorMessage);
     }
 
