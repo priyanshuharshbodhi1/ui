@@ -14,6 +14,7 @@ import (
 func setupAuthRoutes(router *gin.Engine) {
 	// Authentication routes
 	router.POST("/login", LoginHandler)
+	router.POST("/auth/refresh", RefreshTokenHandler)
 
 	// API group for all endpoints
 	api := router.Group("/api")
@@ -78,15 +79,16 @@ func LoginHandler(c *gin.Context) {
 		return
 	}
 
-	// Fixed: Pass both username and permissions to GenerateToken
-	token, err := utils.GenerateToken(loginData.Username, user.Permissions)
+	// Generate access token and refresh token
+	token, refreshToken, err := utils.GenerateTokenPair(loginData.Username, user.Permissions)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating token"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating tokens"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
+		"refreshToken": refreshToken,
 		"user": gin.H{
 			"username":    user.Username,
 			"permissions": user.Permissions,
