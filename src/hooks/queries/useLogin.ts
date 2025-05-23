@@ -28,6 +28,10 @@ export const useLogin = () => {
 
         localStorage.setItem('jwtToken', response.token);
 
+        if (response.refreshToken) {
+          localStorage.setItem('refreshToken', response.refreshToken);
+        }
+
         if (rememberMe) {
           localStorage.setItem('rememberedUsername', username);
           localStorage.setItem('rememberedPassword', btoa(password));

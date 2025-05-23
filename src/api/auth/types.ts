@@ -5,6 +5,7 @@ export type LoginDetails = {
 
 export type LoginResponse = {
   token: string;
+  refreshToken: string;
   user: {
     permissions: string[];
     username: string;

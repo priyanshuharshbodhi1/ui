@@ -19,16 +19,18 @@ export const useAuth = () => {
         logout();
         return;
       }
-      
+
       // Get time until expiration and set up auto-refresh
       const timeUntilExpiration = getTimeUntilExpiration(token);
-      
+
       // If token is about to expire in the next 5 minutes, refresh auth state
       if (timeUntilExpiration > 0 && timeUntilExpiration < 5 * 60 * 1000) {
-        console.log(`Token expiring soon (${Math.round(timeUntilExpiration / 1000)}s), refreshing auth state`);
+        console.log(
+          `Token expiring soon (${Math.round(timeUntilExpiration / 1000)}s), refreshing auth state`
+        );
         queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY });
       }
-      
+
       // Set up a timer to check token expiration and logout when it expires
       // This handles cases where the user has the app open but isn't making requests
       const expirationTimer = setTimeout(() => {
@@ -36,7 +38,7 @@ export const useAuth = () => {
         logout();
         navigate('/login', { replace: true });
       }, timeUntilExpiration);
-      
+
       // Clean up timer on unmount
       return () => clearTimeout(expirationTimer);
     }
@@ -50,7 +52,7 @@ export const useAuth = () => {
       if (!token) {
         return { isAuthenticated: false };
       }
-      
+
       // Check client-side if token is expired before making API call
       if (isTokenExpired(token)) {
         console.warn('Token expired, skipping verification');
@@ -77,6 +79,7 @@ export const useAuthActions = () => {
   return {
     logout: () => {
       localStorage.removeItem('jwtToken');
+      localStorage.removeItem('refreshToken');
       localStorage.setItem('tokenRemovalTime', Date.now().toString());
       queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY });
     },
@@ -88,6 +91,7 @@ export const useAuthActions = () => {
 
 export const logout = () => {
   localStorage.removeItem('jwtToken');
+  localStorage.removeItem('refreshToken');
   localStorage.setItem('tokenRemovalTime', Date.now().toString());
   window.dispatchEvent(new Event('storage'));
 };
