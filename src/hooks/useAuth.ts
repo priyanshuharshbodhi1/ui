@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { VerifyToken } from '../api/auth';
 import { AUTH_QUERY_KEY } from '../api/auth/constant';
 import { isTokenExpired, getTimeUntilExpiration } from '../utils/tokenUtils';
+import { refreshAccessToken } from '../lib/api';
 
 export const useAuth = () => {
   const navigate = useNavigate();
@@ -31,12 +32,20 @@ export const useAuth = () => {
         queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY });
       }
 
-      // Set up a timer to check token expiration and logout when it expires
+      // Set up a timer to refresh token when it expires
       // This handles cases where the user has the app open but isn't making requests
-      const expirationTimer = setTimeout(() => {
-        console.warn('Token expired via timer, logging out');
-        logout();
-        navigate('/login', { replace: true });
+      const expirationTimer = setTimeout(async () => {
+        try {
+          // Try to refresh the token when it expires
+          await refreshAccessToken();
+          console.log('Token refreshed automatically via timer');
+          queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY });
+        } catch {
+          // Only logout if refresh token is invalid or missing
+          console.warn('Token refresh failed, logging out');
+          logout();
+          navigate('/login', { replace: true });
+        }
       }, timeUntilExpiration);
 
       // Clean up timer on unmount

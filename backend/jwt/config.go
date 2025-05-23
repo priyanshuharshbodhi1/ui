@@ -11,10 +11,10 @@ import (
 
 const (
 	// Default token expiration time (24 hours)
-	DefaultTokenExpiration = 24 * time.Hour
+	DefaultTokenExpiration = 1 * time.Minute //DefaultTokenExpiration = 24 * time.Hour
 
-	// Default refresh token expiration time (7 days)
-	DefaultRefreshTokenExpiration = 7 * 24 * time.Hour
+	// Default refresh token expiration time (15 days)
+	DefaultRefreshTokenExpiration = 15 * 24 * time.Hour
 
 	// Environment variable names
 	JWTSecretEnv         = "JWT_SECRET"

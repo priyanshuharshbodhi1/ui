@@ -20,7 +20,8 @@ export const api = axios.create({
 
 let refreshTokenPromise: Promise<string> | null = null;
 
-async function refreshAccessToken(): Promise<string> {
+// Function to refresh the access token using refresh token
+export async function refreshAccessToken(): Promise<string> {
   if (refreshTokenPromise) {
     return refreshTokenPromise;
   }
@@ -33,8 +34,9 @@ async function refreshAccessToken(): Promise<string> {
   refreshTokenPromise = new Promise<string>((resolve, reject) => {
     refreshToken({ refreshToken: oldRefreshToken })
       .then(response => {
+        // Only store the new access token, don't overwrite refresh token
+        // as the backend returns the same refresh token
         localStorage.setItem('jwtToken', response.token);
-        localStorage.setItem('refreshToken', response.refreshToken);
         resolve(response.token);
       })
       .catch(err => {

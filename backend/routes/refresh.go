@@ -25,16 +25,16 @@ func RefreshTokenHandler(c *gin.Context) {
 		return
 	}
 
-	// Generate new token for the user
-	newToken, newRefreshToken, err := utils.GenerateTokenPair(refreshClaims.Username, refreshClaims.Permissions)
+	// Generate only a new access token, reuse the existing refresh token
+	newToken, err := utils.GenerateAccessToken(refreshClaims.Username, refreshClaims.Permissions)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating new tokens"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating new access token"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"token":        newToken,
-		"refreshToken": newRefreshToken,
+		"refreshToken": refreshData.RefreshToken, // Return the same refresh token
 		"user": gin.H{
 			"username":    refreshClaims.Username,
 			"permissions": refreshClaims.Permissions,

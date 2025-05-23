@@ -74,6 +74,38 @@ func GenerateTokenPair(username string, permissions []string) (string, string, e
 	return accessTokenString, refreshTokenString, nil
 }
 
+// GenerateAccessToken creates only a new JWT access token for a user
+func GenerateAccessToken(username string, permissions []string) (string, error) {
+	// Generate a random token ID for this session
+	tokenID := fmt.Sprintf("%d", time.Now().UnixNano())
+	
+	// Get token expiration time
+	accessExpTime := jwtconfig.GetTokenExpiration()
+	
+	// Create access token claims
+	accessClaims := TokenClaims{
+		Username:    username,
+		Permissions: permissions,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(accessExpTime)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "kubestellar-ui",
+			ID:        tokenID,
+		},
+	}
+	
+	// Create token with claims
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
+
+	// Sign token
+	accessTokenString, err := accessToken.SignedString([]byte(jwtconfig.GetJWTSecret()))
+	if err != nil {
+		return "", fmt.Errorf("failed to sign access token: %v", err)
+	}
+
+	return accessTokenString, nil
+}
+
 // GenerateToken creates a new JWT token for a user with specified permissions
 // Maintained for backward compatibility
 func GenerateToken(username string, permissions []string) (string, error) {
