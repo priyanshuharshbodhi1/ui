@@ -2,6 +2,7 @@ import React, { ChangeEvent, RefObject, useState } from 'react';
 import { Box, Button, CircularProgress, Alert, SxProps, Theme } from '@mui/material';
 import { CommandResponse, Colors } from './ImportClusters';
 import OnboardingLogsDisplay from './OnboardingLogsDisplay';
+import CancelButton from './common/CancelButton';
 
 interface ManualImportTabProps {
   theme: string;
@@ -1066,9 +1067,7 @@ const ManualImportTab: React.FC<ManualImportTabProps> = ({
                 >
                   Back
                 </Button>
-                <Button variant="outlined" onClick={onCancel} sx={secondaryButtonStyles}>
-                  Close
-                </Button>
+                <CancelButton onClick={onCancel} />
               </Box>
               <Button
                 variant="contained"
